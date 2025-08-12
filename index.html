@@ -1,886 +1,805 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Enhanced YouTube Live Sub Counter</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    * { box-sizing: border-box; }
-    :root { 
-      --bg: #0a0e16; --card: #1a1f2e; --accent: #6366f1; --success: #10b981; 
-      --warning: #f59e0b; --danger: #ef4444; --text: #f8fafc; --muted: #94a3b8; 
-      --border: rgba(255,255,255,0.1); --glow: 0 0 30px rgba(99,102,241,0.3);
-    }
-    body { 
-      margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; 
-      background: radial-gradient(ellipse at top, #1e1b4b, #0a0e16); color: var(--text); 
-      min-height: 100vh; overflow-x: hidden;
-    }
-    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-    .glass { 
-      background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); 
-      border: 1px solid var(--border); border-radius: 16px; 
-      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-    }
-    .header { text-align: center; padding: 30px 20px; }
-    .title { font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #6366f1, #8b5cf6); 
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; }
-    .subtitle { color: var(--muted); margin: 10px 0 0; font-size: 1.1rem; }
-    .search-section { padding: 20px; }
-    .search-box { position: relative; margin-bottom: 20px; }
-    .search-input { 
-      width: 100%; padding: 16px 50px 16px 20px; font-size: 16px; 
-      background: var(--card); border: 2px solid var(--border); border-radius: 12px; 
-      color: var(--text); transition: all 0.3s ease;
-    }
-    .search-input:focus { outline: none; border-color: var(--accent); box-shadow: var(--glow); }
-    .search-btn { 
-      position: absolute; right: 8px; top: 50%; transform: translateY(-50%); 
-      background: var(--accent); border: none; padding: 8px 16px; border-radius: 8px; 
-      color: white; cursor: pointer; transition: all 0.2s;
-    }
-    .search-btn:hover { background: #5b21b6; transform: translateY(-50%) scale(1.05); }
-    .quick-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
-    .btn { 
-      padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer; 
-      font-weight: 600; transition: all 0.2s; position: relative; overflow: hidden;
-    }
-    .btn-primary { background: var(--accent); color: white; }
-    .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
-    .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
-    .grid { display: grid; grid-template-columns: 1fr 400px; gap: 24px; margin-top: 20px; }
-    .results-panel { padding: 20px; max-height: 60vh; overflow-y: auto; }
-    .channel-card { 
-      display: flex; align-items: center; gap: 15px; padding: 12px; border-radius: 12px; 
-      cursor: pointer; transition: all 0.3s; margin-bottom: 8px; background: rgba(255,255,255,0.02);
-    }
-    .channel-card:hover { 
-      background: rgba(255,255,255,0.08); transform: translateY(-2px); 
-      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-    }
-    .avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); }
-    .channel-info { flex: 1; }
-    .channel-name { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
-    .channel-subs { color: var(--muted); font-size: 14px; }
-    .counter-panel { padding: 24px; text-align: center; }
-    .counter-display { margin: 20px 0; }
-    .sub-count { 
-      font-size: 3.5rem; font-weight: 900; margin: 10px 0; 
-      background: linear-gradient(135deg, var(--accent), var(--success)); 
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    }
-    .channel-title { font-size: 18px; margin-bottom: 8px; }
-    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin: 20px 0; }
-    .stat { background: var(--card); padding: 12px; border-radius: 8px; text-align: center; }
-    .stat-value { font-weight: 700; font-size: 18px; color: var(--accent); }
-    .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
-    .milestone-section { margin: 20px 0; text-align: left; }
-    .milestone-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin: 12px 0; }
-    .milestone { 
-      padding: 8px 12px; background: var(--card); border-radius: 8px; 
-      cursor: pointer; text-align: center; font-size: 14px; transition: all 0.2s;
-    }
-    .milestone.active { background: var(--success); color: white; }
-    .milestone.triggered { background: var(--warning); color: white; }
-    .notification { 
-      position: fixed; top: 20px; right: 20px; background: var(--success); 
-      padding: 16px 20px; border-radius: 12px; color: white; font-weight: 600; 
-      transform: translateX(400px); transition: transform 0.3s; z-index: 1000;
-    }
-    .notification.show { transform: translateX(0); }
-    .history { max-height: 200px; overflow-y: auto; margin-top: 16px; }
-    .history-item { 
-      background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 6px; 
-      margin-bottom: 4px; font-size: 14px; color: var(--muted);
-    }
-    .controls { display: flex; gap: 12px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
-    @media (max-width: 768px) { 
-      .grid { grid-template-columns: 1fr; } 
-      .title { font-size: 2rem; }
-      .sub-count { font-size: 2.5rem; }
-    }
-    .loading { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--muted); 
-      border-radius: 50%; border-top-color: var(--accent); animation: spin 1s ease-in-out infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .pulse { animation: pulse 2s ease-in-out infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced YouTube Live Sub Counter</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .title {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .search-section {
+            margin-bottom: 30px;
+        }
+        
+        .search-box {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 15px 60px 15px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 50px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+        }
+        
+        .search-btn {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #667eea;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .search-btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        .btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        
+        .btn-primary {
+            background: #667eea;
+        }
+        
+        .btn-primary:hover {
+            background: #5a6fd8;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            gap: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            .title {
+                font-size: 2rem;
+            }
+        }
+        
+        .results-container {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .channel-card {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .channel-card:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+        
+        .channel-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .channel-info h3 {
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+        
+        .channel-subs {
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+        
+        .counter-section {
+            text-align: center;
+        }
+        
+        .counter-display {
+            margin: 20px 0;
+        }
+        
+        .channel-name {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        
+        .sub-count {
+            font-size: 4rem;
+            font-weight: 900;
+            margin: 15px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .milestone-section {
+            margin: 25px 0;
+            text-align: left;
+        }
+        
+        .milestone-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .milestone {
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+        
+        .milestone.active {
+            background: #4CAF50;
+        }
+        
+        .milestone.triggered {
+            background: #FF9800;
+        }
+        
+        .milestone:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .history-section {
+            margin-top: 20px;
+        }
+        
+        .history-container {
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 10px;
+        }
+        
+        .history-item {
+            padding: 8px;
+            margin-bottom: 5px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .custom-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            margin-top: 10px;
+        }
+        
+        .custom-input::placeholder {
+            color: rgba(255,255,255,0.7);
+        }
+        
+        h3, h4 {
+            margin-bottom: 15px;
+            opacity: 0.9;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            opacity: 0.7;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1 class="title">YouTube Live Counter</h1>
-      <p class="subtitle">Real-time subscriber tracking with smart simulation</p>
-    </div>
-
-    <div class="glass search-section">
-      <div class="search-box">
-        <input id="searchInput" class="search-input" placeholder="Search YouTube channels..." autocomplete="off">
-        <button id="searchBtn" class="search-btn">🔍</button>
-      </div>
-      <div class="quick-actions">
-        <button id="notifyBtn" class="btn btn-secondary">🔔 Enable Notifications</button>
-        <button id="fullscreenBtn" class="btn btn-secondary">⛶ Fullscreen Counter</button>
-        <button id="exportBtn" class="btn btn-secondary">📊 Export Data</button>
-      </div>
-    </div>
-
-    <div class="grid">
-      <div class="glass results-panel">
-        <h3 style="margin: 0 0 16px; color: var(--accent);">Search Results</h3>
-        <div id="results"></div>
-      </div>
-
-      <div class="glass counter-panel">
-        <div id="counterDisplay">
-          <div class="channel-title" id="channelTitle">Select a channel to start</div>
-          <div class="sub-count pulse" id="subCount">—</div>
-          
-          <div class="stats-row">
-            <div class="stat">
-              <div class="stat-value" id="growthRate">—</div>
-              <div class="stat-label">subs/hour</div>
-            </div>
-            <div class="stat">
-              <div class="stat-value" id="lastUpdate">—</div>
-              <div class="stat-label">last update</div>
-            </div>
-            <div class="stat">
-              <div class="stat-value" id="accuracy">—</div>
-              <div class="stat-label">accuracy</div>
-            </div>
-          </div>
-
-          <div class="controls">
-            <button id="pauseBtn" class="btn btn-secondary">⏸ Pause</button>
-            <button id="resetBtn" class="btn btn-secondary">🔄 Reset</button>
-            <button id="shareBtn" class="btn btn-primary">📤 Share</button>
-          </div>
-
-          <div class="milestone-section">
-            <h4 style="margin: 0 0 12px; color: var(--accent);">Milestones</h4>
-            <div class="milestone-grid" id="milestones"></div>
-            <input id="customMilestone" placeholder="Custom milestone..." 
-              style="width: 100%; padding: 8px 12px; margin: 8px 0; background: var(--card); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
-          </div>
-
-          <div class="milestone-section">
-            <h4 style="margin: 16px 0 8px; color: var(--accent);">Activity History</h4>
-            <div class="history" id="history"></div>
-          </div>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">🚀 YouTube Live Counter</h1>
+            <p class="subtitle">Real-time subscriber tracking with smart simulation</p>
         </div>
-      </div>
+
+        <div class="card search-section">
+            <div class="search-box">
+                <input id="searchInput" class="search-input" placeholder="Search YouTube channels..." />
+                <button id="searchBtn" class="search-btn">Search</button>
+            </div>
+            <div class="quick-actions">
+                <button id="notifyBtn" class="btn">🔔 Notifications</button>
+                <button id="fullscreenBtn" class="btn">⛶ Fullscreen</button>
+                <button id="exportBtn" class="btn">📊 Export</button>
+                <button id="themeBtn" class="btn">🎨 Theme</button>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>🔍 Search Results</h3>
+                <div id="results" class="results-container">
+                    <div class="empty-state">
+                        <p>Search for YouTube channels to get started!</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card counter-section">
+                <div class="counter-display">
+                    <div id="channelName" class="channel-name">Select a channel</div>
+                    <div id="subCount" class="sub-count">—</div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div id="growthRate" class="stat-value">—</div>
+                            <div class="stat-label">Growth/hr</div>
+                        </div>
+                        <div class="stat-item">
+                            <div id="lastUpdate" class="stat-value">—</div>
+                            <div class="stat-label">Last Update</div>
+                        </div>
+                        <div class="stat-item">
+                            <div id="accuracy" class="stat-value">—</div>
+                            <div class="stat-label">Accuracy</div>
+                        </div>
+                    </div>
+
+                    <div class="controls">
+                        <button id="pauseBtn" class="btn">⏸️ Pause</button>
+                        <button id="resetBtn" class="btn">🔄 Reset</button>
+                        <button id="shareBtn" class="btn btn-primary">📤 Share</button>
+                    </div>
+
+                    <div class="milestone-section">
+                        <h4>🎯 Milestones</h4>
+                        <div id="milestones" class="milestone-grid"></div>
+                        <input id="customMilestone" class="custom-input" placeholder="Add custom milestone (e.g., 75000)" />
+                    </div>
+
+                    <div class="history-section">
+                        <h4>📝 Activity History</h4>
+                        <div id="history" class="history-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <script>
-    const API_KEY = "AIzaSyCW77DSG7O7oowEV_iOg0K_wgJjBzM8Lzs";
-    const DEFAULTS = {
-      milestones: [1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2500000, 5000000],
-      pollInterval: 30000, simInterval: 2000, maxResults: 12
-    };
-
-    let state = {
-      current: null, paused: false, lastReal: 0, simulated: 0, rate: 0, 
-      milestones: new Set(DEFAULTS.milestones), triggered: new Set(), lastPoll: 0
-    };
-
-    const $ = id => document.getElementById(id);
-    const fmt = n => typeof n === 'number' ? n.toLocaleString() : n;
-    const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} };
-    const load = k => { try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; } };
-
-    // Enhanced API with caching and error handling
-    class YouTubeAPI {
-      static cache = new Map();
-      
-      static async search(query) {
-        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=${DEFAULTS.maxResults}&q=${encodeURIComponent(query)}&key=${API_KEY}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`API Error: ${res.status}`);
-        const data = await res.json();
-        return data.items || [];
-      }
-
-      static async getChannelDetails(ids) {
-        const cacheKey = ids.sort().join(',');
-        if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
+    <script>
+        const API_KEY = "AIzaSyCW77DSG7O7oowEV_iOg0K_wgJjBzM8Lzs";
         
-        const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${ids.join(',')}&key=${API_KEY}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`API Error: ${res.status}`);
-        const data = await res.json();
+        const CONFIG = {
+            maxResults: 10,
+            pollInterval: 30000,
+            simInterval: 3000,
+            defaultMilestones: [1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2500000, 5000000]
+        };
+
+        let appState = {
+            currentChannel: null,
+            isPaused: false,
+            subscribers: 0,
+            realSubs: 0,
+            growthRate: 0,
+            milestones: new Set(CONFIG.defaultMilestones),
+            triggeredMilestones: new Set(),
+            lastApiCall: 0,
+            history: []
+        };
+
+        const $ = id => document.getElementById(id);
+        const format = num => typeof num === 'number' ? num.toLocaleString() : num;
         
-        this.cache.set(cacheKey, data.items);
-        setTimeout(() => this.cache.delete(cacheKey), 300000); // 5min cache
-        return data.items || [];
-      }
-    }
-
-    // Smart simulation engine
-    class SimulationEngine {
-      static simulate(current, rate, elapsed) {
-        const baseGrowth = (rate / 3600) * (elapsed / 1000); // rate per second
-        const noise = (Math.random() - 0.5) * 0.3; // ±30% noise
-        const spike = Math.random() < 0.05 ? Math.random() * 2 : 0; // 5% chance of spike
-        
-        let growth = baseGrowth * (1 + noise + spike);
-        if (Math.random() < 0.02) growth *= -0.1; // occasional small drop
-        
-        return Math.max(0, current + growth);
-      }
-
-      static estimateRate(prev, current, timeDiff) {
-        const hourlyRate = ((current - prev) / timeDiff) * 3600000; // per hour
-        return Math.max(0, hourlyRate);
-      }
-    }
-
-    // Notification system
-    class NotificationSystem {
-      static permission = 'default';
-      
-      static async requestPermission() {
-        if ('Notification' in window) {
-          this.permission = await Notification.requestPermission();
-          return this.permission === 'granted';
-        }
-        return false;
-      }
-
-      static show(title, body, icon) {
-        if (this.permission === 'granted') {
-          new Notification(title, { body, icon: icon || '' });
-        }
-        this.showInApp(title + ': ' + body);
-      }
-
-      static showInApp(message) {
-        const notification = document.createElement('div');
-        notification.className = 'notification show';
-        notification.textContent = message;
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 5000);
-      }
-    }
-
-    // UI Controllers
-    const UI = {
-      async searchChannels() {
-        const query = $('searchInput').value.trim();
-        if (!query) return;
-        
-        $('results').innerHTML = '<div class="loading"></div> Searching...';
-        
-        try {
-          const items = await YouTubeAPI.search(query);
-          const ids = items.map(item => item.snippet.channelId);
-          const details = await YouTubeAPI.getChannelDetails(ids);
-          
-          const channels = details.map(detail => ({
-            id: detail.id,
-            name: detail.snippet.title,
-            thumbnail: detail.snippet.thumbnails?.medium?.url || '',
-            subs: parseInt(detail.statistics?.subscriberCount || 0),
-            description: detail.snippet.description || ''
-          }));
-
-          this.renderResults(channels.sort((a, b) => b.subs - a.subs));
-        } catch (error) {
-          $('results').innerHTML = `<div style="color: var(--danger);">Error: ${error.message}</div>`;
-        }
-      },
-
-      renderResults(channels) {
-        $('results').innerHTML = channels.length ? 
-          channels.map(ch => `
-            <div class="channel-card" onclick="App.loadChannel('${ch.id}', '${ch.name.replace(/'/g, "\\'")}', ${ch.subs})">
-              <img src="${ch.thumbnail}" alt="${ch.name}" class="avatar" onerror="this.style.display='none'">
-              <div class="channel-info">
-                <div class="channel-name">${ch.name}</div>
-                <div class="channel-subs">${fmt(ch.subs)} subscribers</div>
-              </div>
-            </div>
-          `).join('') : '<div style="color: var(--muted);">No channels found</div>';
-      },
-
-      updateCounter() {
-        $('subCount').textContent = fmt(Math.floor(state.simulated));
-        $('growthRate').textContent = state.rate > 0 ? Math.round(state.rate).toLocaleString() : '—';
-        $('lastUpdate').textContent = state.lastPoll ? new Date(state.lastPoll).toLocaleTimeString() : '—';
-        $('accuracy').textContent = state.current ? '~95%' : '—';
-        $('pauseBtn').innerHTML = state.paused ? '▶ Resume' : '⏸ Pause';
-      },
-
-      renderMilestones() {
-        const container = $('milestones');
-        container.innerHTML = Array.from(state.milestones).sort((a,b) => a-b).map(ms => {
-          const triggered = state.triggered.has(ms);
-          const active = state.simulated >= ms * 0.95; // Show as active when close
-          return `<div class="milestone ${triggered ? 'triggered' : active ? 'active' : ''}" 
-            onclick="App.toggleMilestone(${ms})">${fmt(ms)}</div>`;
-        }).join('');
-      },
-
-      addHistory(message) {
-        const item = document.createElement('div');
-        item.className = 'history-item';
-        item.innerHTML = `<span style="color: var(--accent);">${new Date().toLocaleTimeString()}</span> ${message}`;
-        $('history').insertBefore(item, $('history').firstChild);
-        
-        // Keep only last 50 items
-        const items = $('history').children;
-        if (items.length > 50) items[items.length - 1].remove();
-      }
-    };
-
-    // Main App Controller
-    const App = {
-      async loadChannel(id, name, initialSubs) {
-        state.current = { id, name };
-        state.lastReal = initialSubs;
-        state.simulated = initialSubs;
-        state.triggered = new Set();
-        
-        $('channelTitle').textContent = name;
-        
-        const saved = load(`channel_${id}`);
-        if (saved) {
-          Object.assign(state, saved);
-          state.simulated = Math.max(state.simulated, initialSubs);
-        }
-        
-        UI.addHistory(`Loaded ${name}`);
-        await this.pollChannel(true);
-        UI.updateCounter();
-        UI.renderMilestones();
-      },
-
-      async pollChannel(force = false) {
-        if (!state.current || (!force && Date.now() - state.lastPoll < DEFAULTS.pollInterval)) return;
-        
-        try {
-          const [details] = await YouTubeAPI.getChannelDetails([state.current.id]);
-          const newSubs = parseInt(details?.statistics?.subscriberCount || 0);
-          
-          if (newSubs !== state.lastReal && state.lastReal > 0) {
-            const timeDiff = Date.now() - state.lastPoll;
-            state.rate = SimulationEngine.estimateRate(state.lastReal, newSubs, timeDiff);
-            UI.addHistory(`Real count updated: ${fmt(newSubs)} (${newSubs > state.lastReal ? '+' : ''}${fmt(newSubs - state.lastReal)})`);
-          }
-          
-          state.lastReal = newSubs;
-          state.simulated = Math.max(state.simulated, newSubs);
-          state.lastPoll = Date.now();
-          
-          store(`channel_${state.current.id}`, { 
-            lastReal: state.lastReal, simulated: state.simulated, rate: state.rate, 
-            triggered: Array.from(state.triggered), lastPoll: state.lastPoll 
-          });
-        } catch (error) {
-          UI.addHistory(`Poll error: ${error.message}`);
-        }
-      },
-
-      simulate() {
-        if (state.paused || !state.current) return;
-        
-        const newCount = SimulationEngine.simulate(state.simulated, state.rate, DEFAULTS.simInterval);
-        state.simulated = newCount;
-        
-        // Check milestones
-        state.milestones.forEach(milestone => {
-          if (!state.triggered.has(milestone) && state.simulated >= milestone) {
-            state.triggered.add(milestone);
-            NotificationSystem.show('Milestone Reached!', 
-              `${state.current.name} hit ${fmt(milestone)} subscribers!`);
-            UI.addHistory(`🎉 Milestone: ${fmt(milestone)} subscribers!`);
-          }
-        });
-        
-        UI.updateCounter();
-        UI.renderMilestones();
-      },
-
-      toggleMilestone(value) {
-        if (state.milestones.has(value)) {
-          state.milestones.delete(value);
-          state.triggered.delete(value);
-        } else {
-          state.milestones.add(value);
-        }
-        UI.renderMilestones();
-      },
-
-      togglePause() {
-        state.paused = !state.paused;
-        UI.addHistory(state.paused ? 'Simulation paused' : 'Simulation resumed');
-        UI.updateCounter();
-      },
-
-      reset() {
-        if (!confirm('Reset all milestones for this channel?')) return;
-        state.triggered.clear();
-        UI.addHistory('Milestones reset');
-        UI.renderMilestones();
-      },
-
-      async share() {
-        const url = `${location.origin}${location.pathname}?channel=${state.current?.id}`;
-        if (navigator.share) {
-          await navigator.share({
-            title: `${state.current?.name} Live Sub Count`,
-            text: `Currently at ${fmt(Math.floor(state.simulated))} subscribers!`,
-            url
-          });
-        } else {
-          await navigator.clipboard.writeText(url);
-          UI.addHistory('Share link copied to clipboard');
-        }
-      },
-
-      fullscreen() {
-        const panel = document.querySelector('.counter-panel');
-        if (panel.requestFullscreen) panel.requestFullscreen();
-      },
-
-      exportData() {
-        const data = {
-          channel: state.current,
-          milestones: Array.from(state.triggered),
-          currentCount: Math.floor(state.simulated),
-          growthRate: state.rate,
-          timestamp: new Date().toISOString()
+        // Storage helpers
+        const saveData = (key, data) => {
+            try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
         };
         
-        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `youtube_data_${state.current?.name || 'export'}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    };
+        const loadData = key => {
+            try { return JSON.parse(localStorage.getItem(key)); } catch(e) { return null; }
+        };
 
-    // Event Listeners
-    $('searchBtn').onclick = () => UI.searchChannels();
-    $('searchInput').addEventListener('keydown', e => e.key === 'Enter' && UI.searchChannels());
-    $('notifyBtn').onclick = () => NotificationSystem.requestPermission();
-    $('pauseBtn').onclick = () => App.togglePause();
-    $('resetBtn').onclick = () => App.reset();
-    $('shareBtn').onclick = () => App.share();
-    $('fullscreenBtn').onclick = () => App.fullscreen();
-    $('exportBtn').onclick = () => App.exportData();
-    
-    $('customMilestone').addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        const value = parseInt(e.target.value.replace(/[^\d]/g, ''));
-        if (value > 0) {
-          state.milestones.add(value);
-          UI.renderMilestones();
-          e.target.value = '';
+        // YouTube API functions
+        async function searchChannels(query) {
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=${CONFIG.maxResults}&q=${encodeURIComponent(query)}&key=${API_KEY}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Search failed');
+            const data = await response.json();
+            return data.items || [];
         }
-      }
-    });
 
-    // Initialize
-    UI.renderMilestones();
-    UI.addHistory('🚀 Enhanced YouTube Counter ready!');
-    setInterval(() => App.pollChannel(), DEFAULTS.pollInterval);
-    setInterval(() => App.simulate(), DEFAULTS.simInterval);
-
-    // Enhanced Features
-    class AdvancedFeatures {
-      static charts = null;
-      static predictions = [];
-      
-      static initCharts() {
-        const canvas = document.createElement('canvas');
-        canvas.id = 'growthChart';
-        canvas.width = 350;
-        canvas.height = 200;
-        canvas.style.background = 'var(--card)';
-        canvas.style.borderRadius = '8px';
-        canvas.style.marginTop = '16px';
-        
-        const chartContainer = document.createElement('div');
-        chartContainer.innerHTML = '<h4 style="margin: 16px 0 8px; color: var(--accent);">Growth Chart</h4>';
-        chartContainer.appendChild(canvas);
-        $('counterDisplay').appendChild(chartContainer);
-        
-        const ctx = canvas.getContext('2d');
-        this.charts = { canvas, ctx, data: [] };
-        return ctx;
-      }
-
-      static updateChart() {
-        if (!this.charts || !state.current) return;
-        
-        const { ctx, canvas, data } = this.charts;
-        const now = Date.now();
-        
-        // Add current data point
-        data.push({ time: now, count: Math.floor(state.simulated) });
-        
-        // Keep last 50 points (about 3 minutes of data)
-        if (data.length > 50) data.shift();
-        
-        // Clear and draw
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        if (data.length < 2) return;
-        
-        // Calculate bounds
-        const counts = data.map(d => d.count);
-        const minCount = Math.min(...counts);
-        const maxCount = Math.max(...counts);
-        const range = maxCount - minCount || 100;
-        
-        // Draw grid
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-        ctx.lineWidth = 1;
-        for (let i = 1; i < 5; i++) {
-          const y = (canvas.height / 5) * i;
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(canvas.width, y);
-          ctx.stroke();
+        async function getChannelDetails(channelIds) {
+            const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelIds.join(',')}&key=${API_KEY}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('API request failed');
+            const data = await response.json();
+            return data.items || [];
         }
-        
-        // Draw growth line
-        ctx.strokeStyle = '#6366f1';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        
-        data.forEach((point, i) => {
-          const x = (i / (data.length - 1)) * canvas.width;
-          const y = canvas.height - ((point.count - minCount) / range) * canvas.height;
-          
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-        
-        // Draw prediction line
-        if (state.rate > 0 && data.length > 10) {
-          ctx.strokeStyle = '#10b981';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([5, 5]);
-          
-          const lastPoint = data[data.length - 1];
-          const futurePoints = 10;
-          
-          ctx.beginPath();
-          ctx.moveTo(canvas.width, canvas.height - ((lastPoint.count - minCount) / range) * canvas.height);
-          
-          for (let i = 1; i <= futurePoints; i++) {
-            const futureCount = lastPoint.count + (state.rate / 3600) * (i * 10);
-            const x = canvas.width + (i * 10);
-            const y = canvas.height - ((futureCount - minCount) / range) * canvas.height;
+
+        // UI Functions
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'notification show';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 4000);
+        }
+
+        function addToHistory(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const historyItem = `${timestamp} - ${message}`;
+            appState.history.unshift(historyItem);
             
-            if (x < canvas.width + 100) ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-          ctx.setLineDash([]);
+            if (appState.history.length > 50) appState.history.pop();
+            
+            updateHistoryDisplay();
         }
-        
-        // Add labels
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '12px sans-serif';
-        ctx.fillText(`${fmt(minCount)}`, 5, canvas.height - 5);
-        ctx.fillText(`${fmt(maxCount)}`, 5, 15);
-      }
 
-      static async predictMilestones() {
-        if (!state.current || state.rate <= 0) return;
-        
-        const predictions = [];
-        const current = Math.floor(state.simulated);
-        
-        // Find next 3 milestones
-        const nextMilestones = Array.from(state.milestones)
-          .filter(m => m > current && !state.triggered.has(m))
-          .sort((a, b) => a - b)
-          .slice(0, 3);
-        
-        nextMilestones.forEach(milestone => {
-          const remaining = milestone - current;
-          const hoursToGo = remaining / state.rate;
-          const eta = new Date(Date.now() + (hoursToGo * 3600000));
-          
-          predictions.push({
-            milestone,
-            eta: eta.toLocaleString(),
-            hoursToGo: hoursToGo.toFixed(1)
-          });
-        });
-        
-        return predictions;
-      }
+        function updateHistoryDisplay() {
+            const historyEl = $('history');
+            historyEl.innerHTML = appState.history.map(item => 
+                `<div class="history-item">${item}</div>`
+            ).join('');
+        }
 
-      static renderPredictions(predictions) {
-        const container = document.getElementById('predictions') || (() => {
-          const div = document.createElement('div');
-          div.id = 'predictions';
-          div.innerHTML = '<h4 style="margin: 16px 0 8px; color: var(--accent);">Milestone Predictions</h4>';
-          $('counterDisplay').appendChild(div);
-          return div;
-        })();
-        
-        container.innerHTML = '<h4 style="margin: 16px 0 8px; color: var(--accent);">Milestone Predictions</h4>' +
-          (predictions.length ? predictions.map(p => `
-            <div style="background: rgba(255,255,255,0.02); padding: 8px 12px; margin: 4px 0; border-radius: 6px; display: flex; justify-content: space-between;">
-              <span>${fmt(p.milestone)} subs</span>
-              <span style="color: var(--muted); font-size: 12px;">~${p.hoursToGo}h (${p.eta.split(',')[1]})</span>
-            </div>
-          `).join('') : '<div style="color: var(--muted); font-size: 14px;">No predictions available</div>');
-      }
+        function updateCounterDisplay() {
+            $('subCount').textContent = format(Math.floor(appState.subscribers));
+            $('growthRate').textContent = appState.growthRate > 0 ? format(Math.round(appState.growthRate)) : '—';
+            $('lastUpdate').textContent = appState.lastApiCall ? new Date(appState.lastApiCall).toLocaleTimeString() : '—';
+            $('accuracy').textContent = appState.currentChannel ? '~95%' : '—';
+            $('pauseBtn').innerHTML = appState.isPaused ? '▶️ Resume' : '⏸️ Pause';
+        }
 
-      static setupKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-          if (e.ctrlKey || e.metaKey) {
-            switch(e.key) {
-              case 'k':
-                e.preventDefault();
-                $('searchInput').focus();
-                break;
-              case 'f':
-                e.preventDefault();
-                App.fullscreen();
-                break;
-              case 's':
-                e.preventDefault();
-                App.share();
-                break;
+        function renderMilestones() {
+            const container = $('milestones');
+            const sortedMilestones = Array.from(appState.milestones).sort((a, b) => a - b);
+            
+            container.innerHTML = sortedMilestones.map(milestone => {
+                const isTriggered = appState.triggeredMilestones.has(milestone);
+                const isActive = appState.subscribers >= milestone * 0.9;
+                const className = isTriggered ? 'triggered' : isActive ? 'active' : '';
+                
+                return `<div class="milestone ${className}" onclick="toggleMilestone(${milestone})">${format(milestone)}</div>`;
+            }).join('');
+        }
+
+        function renderSearchResults(channels) {
+            const resultsEl = $('results');
+            
+            if (channels.length === 0) {
+                resultsEl.innerHTML = '<div class="empty-state"><p>No channels found. Try a different search term.</p></div>';
+                return;
             }
-          }
-          
-          if (e.key === ' ' && e.target === document.body) {
-            e.preventDefault();
-            App.togglePause();
-          }
-        });
-      }
 
-      static setupThemes() {
-        const themes = {
-          dark: { bg: '#0a0e16', card: '#1a1f2e', accent: '#6366f1' },
-          blue: { bg: '#0f172a', card: '#1e293b', accent: '#0ea5e9' },
-          purple: { bg: '#1e1b4b', card: '#312e81', accent: '#8b5cf6' },
-          green: { bg: '#052e16', card: '#14532d', accent: '#10b981' }
-        };
-        
-        const themeSelector = document.createElement('select');
-        themeSelector.style.cssText = 'background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; margin: 0 8px;';
-        themeSelector.innerHTML = Object.keys(themes).map(t => `<option value="${t}">${t}</option>`).join('');
-        
-        themeSelector.onchange = (e) => {
-          const theme = themes[e.target.value];
-          Object.entries(theme).forEach(([prop, val]) => {
-            document.documentElement.style.setProperty(`--${prop}`, val);
-          });
-          store('theme', e.target.value);
-        };
-        
-        // Add to quick actions
-        const label = document.createElement('label');
-        label.innerHTML = '🎨 Theme: ';
-        label.appendChild(themeSelector);
-        $('notifyBtn').parentNode.appendChild(label);
-        
-        // Load saved theme
-        const saved = load('theme');
-        if (saved && themes[saved]) {
-          themeSelector.value = saved;
-          themeSelector.onchange({ target: { value: saved } });
+            resultsEl.innerHTML = channels.map(channel => `
+                <div class="channel-card" onclick="loadChannel('${channel.id}', '${channel.title.replace(/'/g, "\\'")}', ${channel.subscriberCount})">
+                    <img src="${channel.thumbnail}" alt="${channel.title}" class="channel-avatar" onerror="this.style.display='none'">
+                    <div class="channel-info">
+                        <h3>${channel.title}</h3>
+                        <div class="channel-subs">${format(channel.subscriberCount)} subscribers</div>
+                    </div>
+                </div>
+            `).join('');
         }
-      }
 
-      static setupComparisons() {
-        const compareBtn = document.createElement('button');
-        compareBtn.className = 'btn btn-secondary';
-        compareBtn.innerHTML = '⚖️ Compare';
-        compareBtn.onclick = () => this.showCompareModal();
-        $('exportBtn').parentNode.appendChild(compareBtn);
-        
-        this.compareData = load('comparisons') || [];
-      }
+        // Core Functions
+        async function performSearch() {
+            const query = $('searchInput').value.trim();
+            if (!query) return;
 
-      static showCompareModal() {
-        if (!state.current) return;
-        
-        const modal = document.createElement('div');
-        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000;';
-        
-        modal.innerHTML = `
-          <div class="glass" style="padding: 24px; max-width: 500px; width: 90%;">
-            <h3 style="margin: 0 0 16px; color: var(--accent);">Channel Comparison</h3>
-            <div style="margin-bottom: 16px;">
-              <strong>${state.current.name}</strong><br>
-              Current: ${fmt(Math.floor(state.simulated))} subs<br>
-              Growth: ${Math.round(state.rate)}/hour
-            </div>
-            <div id="compareList" style="max-height: 200px; overflow-y: auto; margin-bottom: 16px;"></div>
-            <div style="display: flex; gap: 8px; justify-content: end;">
-              <button class="btn btn-secondary" onclick="this.parentElement.parentElement.parentElement.remove()">Close</button>
-              <button class="btn btn-primary" onclick="AdvancedFeatures.addToComparison(); this.parentElement.parentElement.parentElement.remove();">Add to Comparison</button>
-            </div>
-          </div>
-        `;
-        
-        document.body.appendChild(modal);
-        modal.onclick = e => e.target === modal && modal.remove();
-        
-        // Load comparison list
-        const compareList = modal.querySelector('#compareList');
-        compareList.innerHTML = this.compareData.length ? 
-          this.compareData.map((c, i) => `
-            <div style="background: rgba(255,255,255,0.02); padding: 8px; margin: 4px 0; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <strong>${c.name}</strong><br>
-                <small style="color: var(--muted);">${fmt(c.subs)} subs • ${c.rate}/hr • ${c.date}</small>
-              </div>
-              <button onclick="AdvancedFeatures.compareData.splice(${i}, 1); AdvancedFeatures.updateCompareList()" style="background: var(--danger); border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer;">×</button>
-            </div>
-          `).join('') : '<div style="color: var(--muted);">No comparisons yet</div>';
-      }
+            $('results').innerHTML = '<div style="text-align: center; padding: 20px;"><div class="loading"></div><br>Searching...</div>';
 
-      static addToComparison() {
-        if (!state.current) return;
-        
-        const entry = {
-          name: state.current.name,
-          id: state.current.id,
-          subs: Math.floor(state.simulated),
-          rate: Math.round(state.rate),
-          date: new Date().toLocaleDateString()
-        };
-        
-        // Remove existing entry for same channel
-        this.compareData = this.compareData.filter(c => c.id !== entry.id);
-        this.compareData.unshift(entry);
-        
-        // Keep only last 10
-        if (this.compareData.length > 10) this.compareData.length = 10;
-        
-        store('comparisons', this.compareData);
-        UI.addHistory('Added to comparisons');
-      }
+            try {
+                const searchResults = await searchChannels(query);
+                const channelIds = searchResults.map(item => item.snippet.channelId);
+                const channelDetails = await getChannelDetails(channelIds);
 
-      static async setupAutoSave() {
-        // Auto-save state every 30 seconds
-        setInterval(() => {
-          if (state.current) {
-            const saveData = {
-              current: state.current,
-              simulated: state.simulated,
-              rate: state.rate,
-              triggered: Array.from(state.triggered),
-              milestones: Array.from(state.milestones),
-              lastSave: Date.now()
+                const channels = channelDetails.map(channel => ({
+                    id: channel.id,
+                    title: channel.snippet.title,
+                    thumbnail: channel.snippet.thumbnails?.medium?.url || '',
+                    subscriberCount: parseInt(channel.statistics?.subscriberCount || 0)
+                }));
+
+                channels.sort((a, b) => b.subscriberCount - a.subscriberCount);
+                renderSearchResults(channels);
+                
+            } catch (error) {
+                $('results').innerHTML = `<div class="empty-state"><p>❌ Error: ${error.message}</p></div>`;
+            }
+        }
+
+        async function loadChannel(channelId, channelTitle, subscriberCount) {
+            appState.currentChannel = { id: channelId, title: channelTitle };
+            appState.subscribers = subscriberCount;
+            appState.realSubs = subscriberCount;
+            appState.triggeredMilestones.clear();
+            
+            $('channelName').textContent = channelTitle;
+            
+            addToHistory(`Loaded ${channelTitle}`);
+            updateCounterDisplay();
+            renderMilestones();
+            
+            // Load saved data if available
+            const savedData = loadData(`channel_${channelId}`);
+            if (savedData) {
+                appState.triggeredMilestones = new Set(savedData.triggered || []);
+                appState.growthRate = savedData.growthRate || 0;
+                renderMilestones();
+            }
+            
+            await pollChannelData(true);
+        }
+
+        async function pollChannelData(force = false) {
+            if (!appState.currentChannel) return;
+            
+            const now = Date.now();
+            if (!force && (now - appState.lastApiCall) < CONFIG.pollInterval) return;
+
+            try {
+                const [channelData] = await getChannelDetails([appState.currentChannel.id]);
+                const newSubCount = parseInt(channelData?.statistics?.subscriberCount || 0);
+                
+                if (newSubCount !== appState.realSubs && appState.realSubs > 0) {
+                    const timeDiff = now - appState.lastApiCall;
+                    const subDiff = newSubCount - appState.realSubs;
+                    appState.growthRate = (subDiff / timeDiff) * 3600000; // per hour
+                    
+                    addToHistory(`Real update: ${format(newSubCount)} (${subDiff > 0 ? '+' : ''}${format(subDiff)})`);
+                }
+                
+                appState.realSubs = newSubCount;
+                appState.subscribers = Math.max(appState.subscribers, newSubCount);
+                appState.lastApiCall = now;
+                
+                saveData(`channel_${appState.currentChannel.id}`, {
+                    triggered: Array.from(appState.triggeredMilestones),
+                    growthRate: appState.growthRate,
+                    lastUpdate: now
+                });
+                
+                updateCounterDisplay();
+                
+            } catch (error) {
+                addToHistory(`API error: ${error.message}`);
+            }
+        }
+
+        function simulateGrowth() {
+            if (appState.isPaused || !appState.currentChannel) return;
+            
+            const baseRate = Math.max(appState.growthRate || 1, 0.5);
+            const timeMultiplier = CONFIG.simInterval / 3600000; // Convert to hours
+            const variance = (Math.random() - 0.5) * 0.4; // ±20% variance
+            const spike = Math.random() < 0.05 ? Math.random() * 2 : 0; // 5% chance of spike
+            
+            let growth = baseRate * timeMultiplier * (1 + variance + spike);
+            
+            // Occasional small dips
+            if (Math.random() < 0.03) growth *= -0.1;
+            
+            appState.subscribers = Math.max(0, appState.subscribers + growth);
+            
+            checkMilestones();
+            updateCounterDisplay();
+        }
+
+        function checkMilestones() {
+            appState.milestones.forEach(milestone => {
+                if (!appState.triggeredMilestones.has(milestone) && appState.subscribers >= milestone) {
+                    appState.triggeredMilestones.add(milestone);
+                    
+                    const message = `🎉 ${appState.currentChannel.title} reached ${format(milestone)} subscribers!`;
+                    showNotification(message);
+                    addToHistory(`Milestone: ${format(milestone)}`);
+                    
+                    // Browser notification
+                    if (Notification.permission === 'granted') {
+                        new Notification('Milestone Reached!', { body: message });
+                    }
+                    
+                    renderMilestones();
+                }
+            });
+        }
+
+        function toggleMilestone(milestone) {
+            if (appState.milestones.has(milestone)) {
+                appState.milestones.delete(milestone);
+                appState.triggeredMilestones.delete(milestone);
+            } else {
+                appState.milestones.add(milestone);
+            }
+            renderMilestones();
+        }
+
+        function togglePause() {
+            appState.isPaused = !appState.isPaused;
+            addToHistory(appState.isPaused ? 'Simulation paused' : 'Simulation resumed');
+            updateCounterDisplay();
+        }
+
+        function resetMilestones() {
+            if (!appState.currentChannel) return;
+            if (!confirm('Reset all milestones for this channel?')) return;
+            
+            appState.triggeredMilestones.clear();
+            addToHistory('Milestones reset');
+            renderMilestones();
+        }
+
+        async function shareChannel() {
+            if (!appState.currentChannel) return;
+            
+            const shareData = {
+                title: `${appState.currentChannel.title} Live Sub Count`,
+                text: `Currently at ${format(Math.floor(appState.subscribers))} subscribers!`,
+                url: `${window.location.origin}${window.location.pathname}?channel=${appState.currentChannel.id}`
             };
-            store('autoSave', saveData);
-          }
-        }, 30000);
-        
-        // Load auto-saved state on startup
-        const saved = load('autoSave');
-        if (saved && saved.lastSave && (Date.now() - saved.lastSave < 3600000)) { // 1 hour
-          const shouldRestore = confirm('Found recent session data. Restore previous session?');
-          if (shouldRestore) {
-            state.current = saved.current;
-            state.simulated = saved.simulated;
-            state.rate = saved.rate;
-            state.triggered = new Set(saved.triggered || []);
-            state.milestones = new Set(saved.milestones || DEFAULTS.milestones);
             
-            if (state.current) {
-              $('channelTitle').textContent = state.current.name;
-              UI.updateCounter();
-              UI.renderMilestones();
-              UI.addHistory('Session restored');
+            try {
+                if (navigator.share) {
+                    await navigator.share(shareData);
+                } else {
+                    await navigator.clipboard.writeText(shareData.url);
+                    showNotification('Share link copied to clipboard!');
+                }
+                addToHistory('Channel shared');
+            } catch (error) {
+                console.log('Share failed:', error);
             }
-          }
         }
-      }
 
-      static setupAnalytics() {
-        // Simple analytics tracking
-        const analytics = {
-          channelsLoaded: 0,
-          milestonesHit: 0,
-          totalSimTime: 0,
-          startTime: Date.now()
-        };
-        
-        const savedAnalytics = load('analytics');
-        if (savedAnalytics) Object.assign(analytics, savedAnalytics);
-        
-        // Track channel loads
-        const originalLoadChannel = App.loadChannel;
-        App.loadChannel = function(...args) {
-          analytics.channelsLoaded++;
-          store('analytics', analytics);
-          return originalLoadChannel.apply(this, args);
-        };
-        
-        // Add analytics display
-        const analyticsBtn = document.createElement('button');
-        analyticsBtn.className = 'btn btn-secondary';
-        analyticsBtn.innerHTML = '📊 Stats';
-        analyticsBtn.onclick = () => {
-          const runTime = ((Date.now() - analytics.startTime) / 3600000).toFixed(1);
-          alert(`Session Stats:\n• Channels loaded: ${analytics.channelsLoaded}\n• Milestones hit: ${Array.from(state.triggered).length}\n• Runtime: ${runTime} hours`);
-        };
-        
-        document.querySelector('.quick-actions').appendChild(analyticsBtn);
-      }
-    }
-
-    // Enhanced initialization
-    document.addEventListener('DOMContentLoaded', () => {
-      AdvancedFeatures.setupKeyboardShortcuts();
-      AdvancedFeatures.setupThemes();
-      AdvancedFeatures.setupComparisons();
-      AdvancedFeatures.setupAutoSave();
-      AdvancedFeatures.setupAnalytics();
-      AdvancedFeatures.initCharts();
-      
-      // Enhanced simulation loop
-      const enhancedSimulate = () => {
-        App.simulate();
-        AdvancedFeatures.updateChart();
-        
-        // Update predictions every 30 seconds
-        if (Date.now() % 30000 < DEFAULTS.simInterval) {
-          AdvancedFeatures.predictMilestones().then(predictions => {
-            if (predictions) AdvancedFeatures.renderPredictions(predictions);
-          });
+        function exportData() {
+            if (!appState.currentChannel) return;
+            
+            const exportData = {
+                channel: appState.currentChannel,
+                currentCount: Math.floor(appState.subscribers),
+                growthRate: appState.growthRate,
+                milestones: Array.from(appState.triggeredMilestones),
+                history: appState.history,
+                timestamp: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `youtube_data_${appState.currentChannel.title.replace(/[^a-z0-9]/gi, '_')}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            addToHistory('Data exported');
         }
-      };
-      
-      setInterval(enhancedSimulate, DEFAULTS.simInterval);
-    });
 
-    // URL parameter handling
-    const params = new URLSearchParams(location.search);
-    if (params.has('channel')) {
-      const channelId = params.get('channel');
-      YouTubeAPI.getChannelDetails([channelId]).then(([details]) => {
-        if (details) {
-          App.loadChannel(details.id, details.snippet.title, 
-            parseInt(details.statistics?.subscriberCount || 0));
+        function toggleFullscreen() {
+            const counterPanel = document.querySelector('.counter-section').parentElement;
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                counterPanel.requestFullscreen();
+            }
         }
-      });
-    }
 
-    // Add help tooltip
-    const helpBtn = document.createElement('button');
-    helpBtn.innerHTML = '❓';
-    helpBtn.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--accent); border: none; color: white; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 18px;';
-    helpBtn.onclick = () => alert('Keyboard Shortcuts:\n• Ctrl/Cmd + K: Focus search\n• Ctrl/Cmd + F: Fullscreen\n• Ctrl/Cmd + S: Share\n• Space: Pause/Resume\n\nFeatures:\n• Real-time growth tracking\n• Smart milestone predictions\n• Channel comparisons\n• Data export & analytics');
-    document.body.appendChild(helpBtn);
-  </script>
+        async function requestNotifications() {
+            if (!('Notification' in window)) {
+                showNotification('Notifications not supported');
+                return;
+            }
+            
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                showNotification('Notifications enabled!');
+            } else {
+                showNotification('Notifications denied');
+            }
+        }
+
+        // Event Listeners
+        $('searchBtn').addEventListener('click', performSearch);
+        $('searchInput').addEventListener('keypress', e => e.key === 'Enter' && performSearch());
+        $('notifyBtn').addEventListener('click', requestNotifications);
+        $('fullscreenBtn').addEventListener('click', toggleFullscreen);
+        $('exportBtn').addEventListener('click', exportData);
+        $('pauseBtn').addEventListener('click', togglePause);
+        $('resetBtn').addEventListener('click', resetMilestones);
+        $('shareBtn').addEventListener('click', shareChannel);
+
+        $('customMilestone').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const value = parseInt(this.value.replace(/[^\d]/g, ''));
+                if (value > 0) {
+                    appState.milestones.add(value);
+                    renderMilestones();
+                    this.value = '';
+                    addToHistory(`Added milestone: ${format(value)}`);
+                }
+            }
+        });
+
+        // Theme cycling
+        const themes = [
+            { name: 'Purple', bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
+            { name: 'Ocean', bg: 'linear-gradient(135deg, #667eea 0%, #5cbdbd 100%)' },
+            { name: 'Sunset', bg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
+            { name: 'Forest', bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }
+        ];
+        
+        let currentTheme = 0;
+        $('themeBtn').addEventListener('click', () => {
+            currentTheme = (currentTheme + 1) % themes.length;
+            document.body.style.background = themes[currentTheme].bg;
+            showNotification(`Theme: ${themes[currentTheme].name}`);
+        });
+
+        // Initialize
+        renderMilestones();
+        updateCounterDisplay();
+        addToHistory('🚀 YouTube Live Counter ready!');
+
+        // Start polling and simulation
+        setInterval(pollChannelData, CONFIG.pollInterval);
+        setInterval(simulateGrowth, CONFIG.simInterval);
+
+        // Load channel from URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('channel')) {
+            const channelId = urlParams.get('channel');
+            getChannelDetails([channelId]).then(channels => {
+                if (channels.length > 0) {
+                    const channel = channels[0];
+                    loadChannel(
+                        channel.id, 
+                        channel.snippet.title, 
+                        parseInt(channel.statistics?.subscriberCount || 0)
+                    );
+                }
+            }).catch(console.error);
+        }
+    </script>
 </body>
 </html>
