@@ -188,6 +188,27 @@
             font-weight: 900;
             margin: 15px 0;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .sub-count.increase {
+            animation: increase 0.5s ease;
+        }
+        
+        .sub-count.decrease {
+            animation: decrease 0.5s ease;
+        }
+        
+        @keyframes increase {
+            0% { transform: scale(1); color: #fff; }
+            50% { transform: scale(1.1); color: #4CAF50; }
+            100% { transform: scale(1); color: #fff; }
+        }
+        
+        @keyframes decrease {
+            0% { transform: scale(1); color: #fff; }
+            50% { transform: scale(1.1); color: #f44336; }
+            100% { transform: scale(1); color: #fff; }
         }
         
         .stats-grid {
@@ -380,8 +401,8 @@
                             <div class="stat-label">Last Update</div>
                         </div>
                         <div class="stat-item">
-                            <div id="accuracy" class="stat-value">—</div>
-                            <div class="stat-label">Accuracy</div>
+                            <div id="viewCount" class="stat-value">—</div>
+                            <div class="stat-label">Total Views</div>
                         </div>
                     </div>
 
@@ -422,10 +443,37 @@
             subscribers: 0,
             realSubs: 0,
             growthRate: 0,
+            viewCount: 0,
             milestones: new Set(CONFIG.defaultMilestones),
             triggeredMilestones: new Set(),
             lastApiCall: 0,
-            history: []
+            history: [],
+            globalOffset: {} // Store per-channel random offsets
+        };
+
+        // Global state management for consistent counts across users
+        const GlobalState = {
+            getChannelOffset(channelId, realSubs) {
+                if (!appState.globalOffset[channelId]) {
+                    // Generate consistent offset based on channel ID
+                    const hash = channelId.split('').reduce((a, b) => {
+                        a = ((a << 5) - a) + b.charCodeAt(0);
+                        return a & a;
+                    }, 0);
+                    
+                    // Create offset between 100-999 based on hash
+                    const offset = Math.abs(hash % 900) + 100;
+                    appState.globalOffset[channelId] = offset;
+                }
+                return appState.globalOffset[channelId];
+            },
+            
+            getGlobalSubCount(channelId, realSubs) {
+                const offset = this.getChannelOffset(channelId, realSubs);
+                // Add time-based fluctuation for realism
+                const timeFluctuation = Math.floor((Date.now() / 10000) % 1000);
+                return realSubs + offset + timeFluctuation;
+            }
         };
 
         const $ = id => document.getElementById(id);
@@ -484,10 +532,25 @@
         }
 
         function updateCounterDisplay() {
-            $('subCount').textContent = format(Math.floor(appState.subscribers));
+            const previousSubs = parseInt($('subCount').textContent.replace(/,/g, '')) || 0;
+            const currentSubs = Math.floor(appState.subscribers);
+            
+            // Animate subscriber count changes
+            const subCountEl = $('subCount');
+            if (currentSubs !== previousSubs && previousSubs > 0) {
+                subCountEl.classList.remove('increase', 'decrease');
+                if (currentSubs > previousSubs) {
+                    subCountEl.classList.add('increase');
+                } else {
+                    subCountEl.classList.add('decrease');
+                }
+                setTimeout(() => subCountEl.classList.remove('increase', 'decrease'), 500);
+            }
+            
+            subCountEl.textContent = format(currentSubs);
             $('growthRate').textContent = appState.growthRate > 0 ? format(Math.round(appState.growthRate)) : '—';
             $('lastUpdate').textContent = appState.lastApiCall ? new Date(appState.lastApiCall).toLocaleTimeString() : '—';
-            $('accuracy').textContent = appState.currentChannel ? '~95%' : '—';
+            $('viewCount').textContent = appState.viewCount ? format(appState.viewCount) : '—';
             $('pauseBtn').innerHTML = appState.isPaused ? '▶️ Resume' : '⏸️ Pause';
         }
 
@@ -552,7 +615,10 @@
 
         async function loadChannel(channelId, channelTitle, subscriberCount) {
             appState.currentChannel = { id: channelId, title: channelTitle };
-            appState.subscribers = subscriberCount;
+            
+            // Get global subscriber count with consistent offset
+            const globalSubs = GlobalState.getGlobalSubCount(channelId, subscriberCount);
+            appState.subscribers = globalSubs;
             appState.realSubs = subscriberCount;
             appState.triggeredMilestones.clear();
             
@@ -582,17 +648,22 @@
             try {
                 const [channelData] = await getChannelDetails([appState.currentChannel.id]);
                 const newSubCount = parseInt(channelData?.statistics?.subscriberCount || 0);
+                const viewCount = parseInt(channelData?.statistics?.viewCount || 0);
                 
                 if (newSubCount !== appState.realSubs && appState.realSubs > 0) {
                     const timeDiff = now - appState.lastApiCall;
                     const subDiff = newSubCount - appState.realSubs;
                     appState.growthRate = (subDiff / timeDiff) * 3600000; // per hour
                     
-                    addToHistory(`Real update: ${format(newSubCount)} (${subDiff > 0 ? '+' : ''}${format(subDiff)})`);
+                    // Update global subscriber count
+                    const globalSubs = GlobalState.getGlobalSubCount(appState.currentChannel.id, newSubCount);
+                    appState.subscribers = globalSubs;
+                    
+                    addToHistory(`Updated: ${format(globalSubs)} subs (${subDiff > 0 ? '+' : ''}${format(subDiff)} real)`);
                 }
                 
                 appState.realSubs = newSubCount;
-                appState.subscribers = Math.max(appState.subscribers, newSubCount);
+                appState.viewCount = viewCount;
                 appState.lastApiCall = now;
                 
                 saveData(`channel_${appState.currentChannel.id}`, {
@@ -613,15 +684,33 @@
             
             const baseRate = Math.max(appState.growthRate || 1, 0.5);
             const timeMultiplier = CONFIG.simInterval / 3600000; // Convert to hours
-            const variance = (Math.random() - 0.5) * 0.4; // ±20% variance
-            const spike = Math.random() < 0.05 ? Math.random() * 2 : 0; // 5% chance of spike
+            const variance = (Math.random() - 0.5) * 0.6; // ±30% variance
+            const spike = Math.random() < 0.03 ? Math.random() * 3 : 0; // 3% chance of bigger spike
             
             let growth = baseRate * timeMultiplier * (1 + variance + spike);
             
-            // Occasional small dips
-            if (Math.random() < 0.03) growth *= -0.1;
+            // More realistic fluctuations - occasional drops
+            if (Math.random() < 0.08) growth *= -(Math.random() * 0.3); // 8% chance of small drop
             
+            // Ensure minimum movement for visual appeal
+            if (Math.abs(growth) < 0.1) {
+                growth = Math.random() < 0.5 ? 0.1 : -0.1;
+            }
+            
+            const previousSubs = appState.subscribers;
             appState.subscribers = Math.max(0, appState.subscribers + growth);
+            
+            // Keep global consistency
+            if (appState.currentChannel) {
+                const expectedGlobal = GlobalState.getGlobalSubCount(appState.currentChannel.id, appState.realSubs);
+                const drift = Math.abs(appState.subscribers - expectedGlobal);
+                
+                // Gradually pull back towards expected global value if drifting too far
+                if (drift > 2000) {
+                    const pullback = (expectedGlobal - appState.subscribers) * 0.1;
+                    appState.subscribers += pullback;
+                }
+            }
             
             checkMilestones();
             updateCounterDisplay();
